@@ -3,20 +3,24 @@
 """
 
 import os
+from sqlalchemy.exc import OperationalError
 from datetime import datetime
 from hmac import compare_digest
 from tempfile import TemporaryDirectory
-
 import uvicorn  # type: ignore
 from colorama import just_fix_windows_console
-from fastapi import FastAPI, File, Header, UploadFile  # type: ignore
+from fastapi import FastAPI, File, Header, UploadFile, Depends,HTTPException
+from sqlalchemy.orm import Session  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
-
+from sqlalchemy import text
+from typing import List
 from writterbot.log import get_log_reversed, make_logger
 from writterbot.settings import API_KEY, IS_TEST
 from writterbot.util import async_download
 from writterbot.version import VERSION
+from writterbot.database import base, engine, SessionLocal
+from . import models, schemas, database
 
 just_fix_windows_console()
 
@@ -28,6 +32,7 @@ log = make_logger(__name__)
 
 APP_DISPLAY_NAME = "writterbot"
 
+base.metadata.create_all(bind=engine)
 
 def app_description() -> str:
     """Get the app description."""
@@ -50,6 +55,7 @@ app = FastAPI(
         "name": "Private program, do not distribute",
     },
     description=app_description(),
+    debug=True,
 )
 
 app.add_middleware(
@@ -65,6 +71,23 @@ if IS_TEST:
 else:
     ApiKeyHeader = Header(...)
 
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+@app.get("/users/{user_id}", response_model=schemas.UserOut)
+async def get_user(user_id: int, db: Session = Depends(get_db)):  # Use the get_db dependency to get a database session
+    # Fetch the user object from the database
+    user = db.query(models.User).filter(models.User.user_id == user_id).first()
+    
+    # Convert the user object to a dictionary
+    user_dict = user.to_dict()
+    
+    # Return the user_dict object, which FastAPI will automatically convert to a UserOut model and serialize to JSON
+    return user_dict
 
 def is_authenticated(api_key: str | None) -> bool:
     """Checks if the request is authenticated."""
@@ -84,10 +107,10 @@ async def index() -> RedirectResponse:
     return RedirectResponse(url="/docs", status_code=302)
 
 
-@app.get("/get")
+@app.get("/eldar")
 async def log_file() -> JSONResponse:
     """TODO - Add description."""
-    return JSONResponse({"hello": "world"})
+    return JSONResponse(IS_TEST)
 
 
 # get the log file
