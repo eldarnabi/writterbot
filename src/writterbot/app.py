@@ -78,6 +78,24 @@ def get_db():
     finally:
         db.close()
 
+@app.post("/register")
+def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    # Check if the email is already registered
+    existing_user = db.query(models.User).filter(models.User.email == user.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # Create a new user object
+    new_user = models.User(email=user.email, password=user.password)
+
+    # Add the new user to the database
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return JSONResponse(status_code=200, content={"message": "User created successfully"})
+
+
 @app.get("/users/{user_id}", response_model=schemas.UserOut)
 async def get_user(user_id: int, db: Session = Depends(get_db)):  # Use the get_db dependency to get a database session
     # Fetch the user object from the database
@@ -88,17 +106,6 @@ async def get_user(user_id: int, db: Session = Depends(get_db)):  # Use the get_
     
     # Return the user_dict object, which FastAPI will automatically convert to a UserOut model and serialize to JSON
     return user_dict
-
-def is_authenticated(api_key: str | None) -> bool:
-    """Checks if the request is authenticated."""
-    if IS_TEST:
-        return True
-    if api_key is None:
-        return False
-    out = compare_digest(api_key, API_KEY)
-    if not out:
-        log.warning("Invalid API key attempted: %s", api_key)
-    return out
 
 
 @app.get("/", include_in_schema=False)
@@ -123,12 +130,6 @@ def route_log() -> PlainTextResponse:
     return PlainTextResponse(out)
 
 
-@app.get("/protected")
-async def protected_route(api_key: str = ApiKeyHeader) -> PlainTextResponse:
-    """TODO - Add description."""
-    if not is_authenticated(api_key):
-        return PlainTextResponse("Not authenticated", status_code=401)
-    return PlainTextResponse("Authenticated")
 
 
 @app.post("/upload")

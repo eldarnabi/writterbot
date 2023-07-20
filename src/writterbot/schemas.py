@@ -9,3 +9,7 @@ class UserOut(BaseModel):
     activation: datetime
     subscription: bool
 
+class UserCreate(BaseModel):
+    email: str
+    password: str
+

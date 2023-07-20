@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Integer, String, DateTime
+from sqlalchemy import Boolean, Column, Integer, String, DateTime, func
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 
@@ -10,7 +10,7 @@ class User(Base):
     user_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     email = Column(String, unique=True, index=True)
     password = Column(String)
-    activation = Column(DateTime, default=None)  # Change this line
+    activation = Column(DateTime, default=func.now())  
     subscription = Column(Boolean, default=False)
 
     def to_dict(self):
